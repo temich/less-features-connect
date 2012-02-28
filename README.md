@@ -3,6 +3,7 @@ less-feature-connect
 
 Usage
 -----
+
     ```javascript
 	var connect = require('connect'),
 		dispatch = require('dispatch'),
