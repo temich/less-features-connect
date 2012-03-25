@@ -5,7 +5,8 @@ var less = require('less-features'),
     fs = require('fs');
 
 var root = path.resolve(process.cwd(), '..'),
-	config = {};
+	config = { libs: [] },
+	cache = {};
 
 function filename(uri) {
 	return path.resolve(root, url.parse(uri).pathname.substr(1)).replace(/\.css\b/, '.less');
@@ -14,13 +15,7 @@ function filename(uri) {
 function options(filename, uri) {
 	var opts = {};
 
-	opts.paths = [];
-	opts.paths.push(path.dirname(filename));
-
-	if (config.libs)
-        config.libs.forEach(function(lib) {
-            opts.paths.push(path.resolve(root, lib));
-        });
+	opts.paths = [path.dirname(filename)].concat(config.libs);
 
 	var s = url.parse(uri).search,
     	q = s ? qs.parse(s.substring(1)) : undefined;
@@ -31,11 +26,23 @@ function options(filename, uri) {
 	return opts;
 }
 
+function read(file, next) {
+	if (!cache[file]) {
+		fs.readFile(file, 'utf-8', function (err, data) {
+			if (err) throw err;
+
+			cache[file] = data;
+			next(data);
+		});
+	} else {
+		next(cache[file]);
+	}
+}
+
 function handle(req, res) {
 	var file = filename(req.url);
 
-	fs.readFile(file, 'utf-8', function (err, data) {
-		if (err) throw err;
+	read(file, function (data) {
 
 		less.render(data, options(file, req.url), function (err, css) {
 			if (err) throw err;
@@ -50,7 +57,10 @@ module.exports = function(libs) {
 	if (!(libs instanceof Array))
 		libs = [libs];
 	
-	config.libs = libs;
+	if (libs)
+		libs.forEach(function (lib) {
+			config.libs.push(path.resolve(root, lib));
+		});
 	
 	return handle;
 };
