@@ -32,25 +32,32 @@ function read(file, next) {
 			if (err) throw err;
 
 			cache[file] = data;
-			next(data);
+			next(data, false);
 		});
 	} else {
-		next(cache[file]);
+		next(cache[file], true);
 	}
 }
 
 function handle(req, res) {
 	var file = filename(req.url);
 
-	read(file, function (data) {
+	res.setHeader('Content-Type', 'text/css');
 
-		less.render(data, options(file, req.url), function (err, css) {
-			if (err) throw err;
+	if (cache[req.url]) {
+		res.end(cache[req.url]);
+	} else
 
-			res.setHeader("Content-Type", "text/css");
-			res.end(css);
+		read(file, function (data, cached) {
+			less.render(data, options(file, req.url), function (err, data) {
+				if (err) throw err;
+
+				cache[req.url] = data;
+
+				res.setHeader('Content-Type', 'text/css');
+				res.end(data);
+			});
 		});
-	});
 }
 
 module.exports = function(libs) {
