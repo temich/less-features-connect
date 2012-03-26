@@ -15,7 +15,7 @@ function filename(uri) {
 function options(filename, uri) {
 	var opts = {};
 
-	opts.paths = [path.dirname(filename)].concat(config.libs);
+	opts.paths = [path.dirname(filename), config.libs];
 
 	var s = url.parse(uri).search,
     	q = s ? qs.parse(s.substring(1)) : undefined;
@@ -27,16 +27,12 @@ function options(filename, uri) {
 }
 
 function read(file, next) {
-	if (!cache[file]) {
-		fs.readFile(file, 'utf-8', function (err, data) {
-			if (err) throw err;
+	fs.readFile(file, 'utf-8', function (err, data) {
+		if (err) throw err;
 
-			cache[file] = data;
-			next(data, false);
-		});
-	} else {
-		next(cache[file], true);
-	}
+		cache[file] = data;
+		next(data, false);
+	});
 }
 
 function handle(req, res) {
@@ -44,30 +40,20 @@ function handle(req, res) {
 
 	res.setHeader('Content-Type', 'text/css');
 
-	if (cache[req.url]) {
-		res.end(cache[req.url]);
-	} else
+	if (cache[req.url])
+		return res.end(cache[req.url]);
 
-		read(file, function (data, cached) {
-			less.render(data, options(file, req.url), function (err, data) {
-				if (err) throw err;
+	read(file, function (data, cached) {
+		less.render(data, options(file, req.url), function (err, data) {
+			if (err) throw err;
 
-				cache[req.url] = data;
-
-				res.setHeader('Content-Type', 'text/css');
-				res.end(data);
-			});
+			config.caching && (cache[req.url] = data);
+			res.end(data);
 		});
+	});
 }
 
-module.exports = function(libs) {
-	if (!(libs instanceof Array))
-		libs = [libs];
-	
-	if (libs)
-		libs.forEach(function (lib) {
-			config.libs.push(path.resolve(root, lib));
-		});
-	
+module.exports = function (cfg) {
+	config = cfg;
 	return handle;
 };
