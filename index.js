@@ -34,10 +34,7 @@ function options(filename) {
 
 function read(file, next) {
 	fs.readFile(file, 'utf-8', function (err, data) {
-		if (err) throw err;
-
-		cache[file] = data;
-		next(data, false);
+		next(err, data);
 	});
 }
 
@@ -50,11 +47,21 @@ function handle(req, res) {
 	var file = filename(req.url),
 		feats = features(req.url);
 
-	less.tree.functions.feature = function (n) {
+	less.tree.functions.feature = function(n) {
 		return feats.indexOf(n.value) !== -1 ? less.tree.True : less.tree.False;
-	}
+	};
 
-	read(file, function (data, cached) {
+	read(file, function (err, data) {
+		if (err) {
+			if (err.code === 'ENOENT') {
+				res.writeHead('404');
+				res.end();
+				return;
+			}
+
+			throw err;
+		}
+
 		less.render(data, options(file), function (err, data) {
 			if (err) throw err;
 
