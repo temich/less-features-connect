@@ -9,6 +9,6 @@
   "main"          : "./index",
   "engines"       : { "node": ">=0.4.0" },
   "dependencies": {
-    "less-features": "1.2.2-features"
+    "less": ">=1.2.2"
   }
 }
