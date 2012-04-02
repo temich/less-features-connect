@@ -6,7 +6,8 @@ var less = require('less'),
 
 var root = path.resolve(process.cwd(), '..'),
 	config = { libs: [] },
-	cache = {};
+	cache = {},
+	logger;
 
 function filename(uri) {
 	return path.resolve(root, url.parse(uri).pathname.substr(1)).replace(/\.css\b/, '.less');
@@ -34,6 +35,8 @@ function options(filename) {
 
 function read(file, next) {
 	fs.readFile(file, 'utf-8', function (err, data) {
+		logger && logger.trace('Reading file ' + file);
+		
 		next(err, data);
 	});
 }
@@ -47,31 +50,32 @@ function handle(req, res) {
 	var file = filename(req.url),
 		feats = features(req.url);
 
-	less.tree.functions.feature = function(n) {
+	less.tree.functions.feature = function (n) {
 		return feats.indexOf(n.value) !== -1 ? less.tree.True : less.tree.False;
 	};
 
 	read(file, function (err, data) {
 		if (err) {
-			if (err.code === 'ENOENT') {
-				res.writeHead('404');
-				res.end();
-				return;
-			}
-
+			res.writeHead(err.code === 'ENOENT' ? '404' : '500');
+			res.end();
 			throw err;
 		}
 
 		less.render(data, options(file), function (err, data) {
+			logger && logger.trace('Rendering file ' + file);
+			
 			if (err) throw err;
 
+			logger && logger.trace('Sending data (%d)', data.length);
+			
 			config.caching && (cache[req.url] = data);
 			res.end(data);
 		});
 	});
 }
 
-module.exports = function (cfg) {
+module.exports = function (cfg, log) {
 	config = cfg;
+	logger = log;
 	return handle;
 };
