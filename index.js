@@ -41,11 +41,13 @@ function read(file, next) {
 	});
 }
 
-function handle(req, res) {
-	res.setHeader('Content-Type', 'text/css');
+function handle(req, res, next) {
+	logger && logger.trace('Processing request ' + req.url);
 
-	if (cache[req.url])
-		return res.end(cache[req.url]);
+	if (cache[req.url]){
+		logger.trace('%s has bben found in cache. Serving from cache', req.url);
+		return res.css(cache[req.url]);
+	}
 
 	var file = filename(req.url),
 		feats = features(req.url);
@@ -56,20 +58,27 @@ function handle(req, res) {
 
 	read(file, function (err, data) {
 		if (err) {
-			res.writeHead(err.code === 'ENOENT' ? '404' : '500');
-			res.end();
-			throw err;
+			if (err.code !== 'ENOENT') {
+				res.error('500');
+				throw err;
+			} else
+				return res.notFound();
 		}
 
-		less.render(data, options(file), function (err, data) {
-			logger && logger.trace('Rendering file ' + file);
-			
-			if (err) throw err;
+		logger && logger.trace('Rendering file ' + file);
 
-			logger && logger.trace('Sending data (%d)', data.length);
-			
+		less.render(data, options(file), function (err, data) {
+			if (err) {
+				res.error();
+				throw err;
+			}
+
+			logger && logger.trace('Sending data (%d bytes) %s', data ? data.length : 0, req.url);
+
 			config.caching && (cache[req.url] = data);
-			res.end(data);
+			res.css(data);
+			logger.trace('%s has been served successfully', req.url);
+			//next();
 		});
 	});
 }
@@ -77,5 +86,6 @@ function handle(req, res) {
 module.exports = function (cfg, log) {
 	config = cfg;
 	logger = log;
+	
 	return handle;
 };
