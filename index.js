@@ -1,4 +1,4 @@
-var less = require('less'),
+var less = require('less-context-functions'),
     path = require('path'),
     url = require('url'),
     qs = require('querystring'),
@@ -10,27 +10,34 @@ var root = path.resolve(process.cwd(), '..'),
 	logger;
 
 function filename(uri) {
-	return path.resolve(root, url.parse(uri).pathname.substr(1)).replace(/\.css\b/, '.less');
+    return path.resolve(root, url.parse(uri).pathname.substr(1)).replace(/\.css\b/, '.less');
+}
+
+function feature(feats) {
+    return function(n) {
+        return feats.indexOf(n.value) !== -1 ? less.tree.True : less.tree.False;
+    }
 }
 
 function features(uri) {
-	var s = url.parse(uri).search,
-    	q = s ? qs.parse(s.substring(1)) : undefined,
-		feats = [];
+    var s = url.parse(uri).search,
+        q = s ? qs.parse(s.substring(1)) : undefined,
+        feats = [];
 
-	if (q && q.features)
-		feats = q.features.split('|');
+    if (q && q.features)
+        feats = q.features.split('|');
 
-	return feats;
+    return feats;
 }
 
-function options(filename) {
-	var opts = {};
+function options(filename, url) {
+    var opts = {};
 
-	opts.paths = [path.dirname(filename), config.libs];
-	opts.compress = config.compress;
+    opts.paths = [path.dirname(filename), config.libs];
+    opts.compress = config.compress;
+    opts.functions = { feature: feature(features(url)) };
 
-	return opts;
+    return opts;
 }
 
 function read(file, next) {
@@ -42,14 +49,12 @@ function read(file, next) {
 }
 
 function handle(req, res, next) {
-	logger && logger.trace('Processing request ' + req.url);
-
-	if (cache[req.url]){
-        logger && logger.trace('%s has been found in cache. Serving from cache', req.url);
+	if (cache[req.url])
 		return res.css(cache[req.url]);
-	}
 
-	var file = filename(req.url),
+    logger && logger.trace('Processing request ' + req.url);
+
+    var file = filename(req.url),
 		feats = features(req.url);
 
 	less.tree.functions.feature = function (n) {
@@ -59,17 +64,17 @@ function handle(req, res, next) {
 	read(file, function (err, data) {
 		if (err) {
 			if (err.code !== 'ENOENT') {
-				res.error().send();
+				res.error().end();
 				throw err;
 			} else
-				return res.notFound().send();
+				return res.notFound().end();
 		}
 
 		logger && logger.trace('Rendering file ' + file);
 
-		less.render(data, options(file), function (err, data) {
+		less.render(data, options(file, req.url), function (err, data) {
 			if (err) {
-				res.error();
+				res.error().end();
 				throw err;
 			}
 
