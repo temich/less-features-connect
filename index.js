@@ -45,7 +45,7 @@ function handle(req, res, next) {
 	logger && logger.trace('Processing request ' + req.url);
 
 	if (cache[req.url]){
-		logger.trace('%s has bben found in cache. Serving from cache', req.url);
+        logger && logger.trace('%s has been found in cache. Serving from cache', req.url);
 		return res.css(cache[req.url]);
 	}
 
@@ -59,10 +59,10 @@ function handle(req, res, next) {
 	read(file, function (err, data) {
 		if (err) {
 			if (err.code !== 'ENOENT') {
-				res.error('500');
+				res.error().send();
 				throw err;
 			} else
-				return res.notFound();
+				return res.notFound().send();
 		}
 
 		logger && logger.trace('Rendering file ' + file);
@@ -77,8 +77,8 @@ function handle(req, res, next) {
 
 			config.caching && (cache[req.url] = data);
 			res.css(data);
-			logger.trace('%s has been served successfully', req.url);
-			//next();
+
+            logger && logger.trace('%s has been served successfully', req.url);
 		});
 	});
 }
