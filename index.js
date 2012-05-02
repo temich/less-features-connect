@@ -54,12 +54,7 @@ function handle(req, res, next) {
 
     logger && logger.trace('Processing request ' + req.url);
 
-    var file = filename(req.url),
-		feats = features(req.url);
-
-	less.tree.functions.feature = function (n) {
-		return feats.indexOf(n.value) !== -1 ? less.tree.True : less.tree.False;
-	};
+    var file = filename(req.url);
 
 	read(file, function (err, data) {
 		if (err) {
