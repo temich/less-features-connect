@@ -9,6 +9,7 @@
   "main"          : "./index",
   "engines"       : { "node": ">=0.4.0" },
   "dependencies": {
-    "less-context-functions": ">=0.0.1"
+    "less-context-functions": ">=0.0.1",
+    "woothee": ">= 0.3.0"
   }
 }
