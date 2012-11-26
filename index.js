@@ -1,49 +1,108 @@
 var less = require('less-context-functions'),
-	path = require('path'),
-	url = require('url'),
-	qs = require('querystring'),
-	fs = require('fs');
+    path = require('path'),
+    url = require('url'),
+    qs = require('querystring'),
+    fs = require('fs');
 
-var root = '',
+var root = path.resolve(process.cwd(), '..'),
 	config = { libs: [] },
 	cache = {},
 	logger;
 
 function filename(uri) {
-	return path.resolve(root, url.parse(uri).pathname.substr(1)).replace(/\.css\b/, '.less');
+    return path.resolve(root, url.parse(uri).pathname.substr(1)).replace(/\.css\b/, '.less');
 }
 
 function feature(feats) {
-	return function(n) {
+    return function(n) {
 		return feats.indexOf(n.value) !== -1 ? less.tree.True : less.tree.False;
+    }
+}
+
+/**
+ * Метод проверки версии браузера
+ * @param {Object} userAgent - информации об агенте пользователя (header['user-agent'])
+ * @return {Function} true - если браузер удовлетворяет условию, иначе false
+ */
+function browser(userAgent) {
+	var ua = require('woothee').parse(userAgent);
+	return function(n) {
+		return checkConditionalComment(ua, n.value) ? less.tree.True : less.tree.False;
+	};
+}
+
+/**
+ * Метод проверки соответсвия браузера условию
+ * @param {Object} userAgent - информация о пользовательском агенте
+ * @param {String} exp - выражение, форма conditional comments
+ * 				форматы: {lt|gt|gte|lte|eq} IE|CH|FF|OP|SF {xx.xx}
+ * @return {Boolean}  true - если браузер удовлетворяет условию, иначе false
+ */
+function checkConditionalComment(userAgent, exp) {
+	if (typeof exp === 'undefined') {
+		return false;
 	}
+
+	// префиксы используемые для сокращения записи выражения
+	var browsers = {
+		'Internet Explorer': 'IE',
+		'Chrome': 'CH',
+		'Firefox': 'FF',
+		'Opera': 'OP',
+		'Safari': 'SF'
+	};
+
+	var conditionals = {
+		'lt': function(a, b) { return a < b; },
+		'lte': function(a, b) { return a <= b; },
+		'gt': function(a, b) { return a > b; },
+		'gte': function(a, b) { return a >= b; },
+		'eq': function(a, b) { return a == b; }
+	};
+
+	var browserVersion = parseFloat(userAgent.version),
+		browserPrefix =  browsers[userAgent.name] || "UNKNOWN",
+		pos = 0,
+		func;
+
+	exp = exp.split(' ');
+
+	//проверяем есть ли условие
+	func = (typeof conditionals[exp[pos]] === 'function') ? conditionals[exp[pos++]] : conditionals.eq; // по умолчанию используется равенство
+
+	var isCorrectBrowser = (browserPrefix === exp[pos++]),
+		isCorrectVersion = (exp[pos]) ? ( func(browserVersion, parseFloat(exp[pos]))) : true; // если не указана версия то не учитывать
+
+	return isCorrectBrowser && isCorrectVersion;
 }
 
 function features(uri) {
-	var s = url.parse(uri).search,
-		q = s ? qs.parse(s.substring(1)) : undefined,
-		feats = [];
+    var s = url.parse(uri).search,
+        q = s ? qs.parse(s.substring(1)) : undefined,
+        feats = [];
 
-	if (q && q.features)
-		feats = q.features.split('|');
+    if (q && q.features)
+        feats = q.features.split('|');
 
-	return feats;
+    return feats;
 }
 
-function options(filename, url) {
-	var opts = {};
+function options(filename, req) {
+    var opts = {},
+		url = req.url,
+		ua = req.headers && req.headers['user-agent'];
 
-	opts.paths = [path.dirname(filename), config.libs];
-	opts.compress = config.compress;
-	opts.functions = { feature: feature(features(url)) };
+    opts.paths = [path.dirname(filename), config.libs];
+    opts.compress = config.compress;
+    opts.functions = { feature: feature(features(url)), browser:browser(ua) };
 
-	return opts;
+    return opts;
 }
 
 function read(file, next) {
 	fs.readFile(file, 'utf-8', function (err, data) {
 		logger && logger.trace('Reading file ' + file);
-
+		
 		next(err, data);
 	});
 }
@@ -52,24 +111,24 @@ function handle(req, res, next) {
 	if (cache[req.url])
 		return res.css(cache[req.url]);
 
-	logger && logger.trace('Processing request ' + req.url);
+    logger && logger.trace('Processing request' + req.url);
 
-	var file = filename(req.url);
+    var file = filename(req.url);
 
 	read(file, function (err, data) {
 		if (err) {
 			if (err.code !== 'ENOENT') {
-				res.error().send();
+				res.error().end();
 				throw err;
 			} else
-				return res.notFound().send();
+				return res.notFound().end();
 		}
 
 		logger && logger.trace('Rendering file ' + file);
 
-		less.render(data, options(file, req.url), function (err, data) {
+		less.render(data, options(file, req), function (err, data) {
 			if (err) {
-				res.error().send();
+				res.error().end();
 				throw err;
 			}
 
@@ -78,7 +137,7 @@ function handle(req, res, next) {
 			config.caching && (cache[req.url] = data);
 			res.css(data);
 
-			logger && logger.trace('%s has been served successfully', req.url);
+            logger && logger.trace('%s has been served successfully', req.url);
 		});
 	});
 }
@@ -86,7 +145,6 @@ function handle(req, res, next) {
 module.exports = function (cfg, log) {
 	config = cfg;
 	logger = log;
-	root = path.resolve(process.cwd(), cfg.base);
-
+	
 	return handle;
 };
