@@ -19,11 +19,6 @@ function feature(feats) {
     }
 }
 
-/**
- * Метод проверки версии браузера
- * @param {Object} userAgent - информации об агенте пользователя (header['user-agent'])
- * @return {Function} true - если браузер удовлетворяет условию, иначе false
- */
 function browser(userAgent) {
 	var ua = require('woothee').parse(userAgent);
 	return function(n) {
@@ -31,33 +26,25 @@ function browser(userAgent) {
 	};
 }
 
-/**
- * Метод проверки соответсвия браузера условию
- * @param {Object} userAgent - информация о пользовательском агенте
- * @param {String} exp - выражение, форма conditional comments
- * 				форматы: {lt|gt|gte|lte|eq} IE|CH|FF|OP|SF {xx.xx}
- * @return {Boolean}  true - если браузер удовлетворяет условию, иначе false
- */
 function checkConditionalComment(userAgent, exp) {
 	if (typeof exp === 'undefined') {
 		return false;
 	}
 
-	// префиксы используемые для сокращения записи выражения
 	var browsers = {
 		'Internet Explorer': 'IE',
-		'Chrome': 'CH',
-		'Firefox': 'FF',
-		'Opera': 'OP',
-		'Safari': 'SF'
+		'Chrome': 'Ch',
+		'Firefox': 'Fx',
+		'Opera': 'Op',
+		'Safari': 'Sf'
 	};
 
 	var conditionals = {
-		'lt': function(a, b) { return a < b; },
-		'lte': function(a, b) { return a <= b; },
-		'gt': function(a, b) { return a > b; },
-		'gte': function(a, b) { return a >= b; },
-		'eq': function(a, b) { return a == b; }
+		'lt': function (a, b) { return a < b; },
+		'lte': function (a, b) { return a <= b; },
+		'gt': function (a, b) { return a > b; },
+		'gte': function (a, b) { return a >= b; },
+		'eq': function (a, b) { return a === b; }
 	};
 
 	var browserVersion = parseFloat(userAgent.version),
@@ -67,7 +54,6 @@ function checkConditionalComment(userAgent, exp) {
 
 	exp = exp.split(' ');
 
-	//проверяем есть ли условие
 	func = (typeof conditionals[exp[pos]] === 'function') ? conditionals[exp[pos++]] : conditionals.eq; // по умолчанию используется равенство
 
 	var isCorrectBrowser = (browserPrefix === exp[pos++]),
@@ -94,7 +80,7 @@ function options(filename, req) {
 
     opts.paths = [path.dirname(filename), config.libs];
     opts.compress = config.compress;
-    opts.functions = { feature: feature(features(url)), browser:browser(ua) };
+    opts.functions = { feature: feature(features(url)), browser: browser(ua) };
 
     return opts;
 }
