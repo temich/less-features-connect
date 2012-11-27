@@ -54,10 +54,10 @@ function checkConditionalComment(userAgent, exp) {
 
 	exp = exp.split(' ');
 
-	func = (typeof conditionals[exp[pos]] === 'function') ? conditionals[exp[pos++]] : conditionals.eq; // по умолчанию используется равенство
+	func = (typeof conditionals[exp[pos]] === 'function') ? conditionals[exp[pos++]] : conditionals.eq;
 
 	var isCorrectBrowser = (browserPrefix === exp[pos++]),
-		isCorrectVersion = (exp[pos]) ? ( func(browserVersion, parseFloat(exp[pos]))) : true; // если не указана версия то не учитывать
+		isCorrectVersion = (exp[pos]) ? ( func(browserVersion, parseFloat(exp[pos]))) : true;
 
 	return isCorrectBrowser && isCorrectVersion;
 }
