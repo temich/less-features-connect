@@ -5,61 +5,89 @@ var less = require('less-context-functions'),
     fs = require('fs');
 
 var root = path.resolve(process.cwd(), '..'),
-	config = { libs: [] },
-	cache = {},
-	logger;
+    config = { libs: [] },
+    cache = {},
+    logger;
+
+function last(arr) {
+    return arr[arr.length - 1];
+}
 
 function filename(uri) {
     return path.resolve(root, url.parse(uri).pathname.substr(1)).replace(/\.css\b/, '.less');
 }
 
 function feature(feats) {
-    return function(n) {
-		return feats.indexOf(n.value) !== -1 ? less.tree.True : less.tree.False;
+    return function (n) {
+        return feats.indexOf(n.value) !== -1 ? less.tree.True : less.tree.False;
     }
 }
 
 function browser(userAgent) {
-	var ua = require('woothee').parse(userAgent);
-	return function(n) {
-		return checkConditionalComment(ua, n.value) ? less.tree.True : less.tree.False;
-	};
+    var ua = require('woothee').parse(userAgent);
+    return function (n) {
+        return checkConditionalComment(ua, n ? n.value : '') ? less.tree.True : less.tree.False;
+    };
 }
 
-function checkConditionalComment(userAgent, exp) {
-	if (typeof exp === 'undefined') {
-		return false;
-	}
+function checkConditionalComment(agent, exp) {
 
-	var browsers = {
-		'Internet Explorer': 'IE',
-		'Chrome': 'Ch',
-		'Firefox': 'Fx',
-		'Opera': 'Op',
-		'Safari': 'Sf'
-	};
+    var browsers = {
+        'Internet Explorer': 'IE',
+        'Chrome': 'Ch',
+        'Firefox': 'Fx',
+        'Opera': 'Op',
+        'Safari': 'Sf'
+    };
 
-	var conditionals = {
-		'lt': function (a, b) { return a < b; },
-		'lte': function (a, b) { return a <= b; },
-		'gt': function (a, b) { return a > b; },
-		'gte': function (a, b) { return a >= b; },
-		'eq': function (a, b) { return a === b; }
-	};
+    var conditionals = {
 
-	var browserVersion = parseFloat(userAgent.version),
-		browserPrefix =  browsers[userAgent.name] || "UNKNOWN",
-		pos = 0,
-		func;
+        lt: function (a, b) {
+            return a < b;
+        },
 
-	exp = exp.split(' ');
+        lte: function (a, b) {
+            return a <= b;
+        },
 
-	func = (typeof conditionals[exp[pos]] === 'function') ? conditionals[exp[pos++]] : conditionals.eq;
+        gt: function (a, b) {
+            return a > b;
+        },
 
-	var isCorrectBrowser = (browserPrefix === exp[pos++]),
-		isCorrectVersion = (exp[pos]) ? ( func(browserVersion, parseFloat(exp[pos]))) : true;
+        gte: function (a, b) {
+            return a >= b;
+        },
 
-	return isCorrectBrowser && isCorrectVersion;
+        eq: function (a, b) {
+            return a === b;
+        },
+
+        not: function (a, b) {
+            return a !== b;
+        }
+
+    };
+
+    var args = exp.split(' '),
+        condition = conditionals[args[0]] ? args.shift() : 'eq',
+        prefix = args.shift(),
+        version = args.shift();
+
+    if (!prefix) {
+        throw 'Browser: Incorrect query syntax ' + exp;
+    }
+
+    var prefixTrue = condition !== 'not'
+        ? browsers[agent.name] === prefix
+        : browsers[agent.name] !== prefix;
+
+    if (!version && ( condition !== 'not' && condition !== 'eq') ){
+        throw 'Browser: Incorrect query syntax: ' + exp;
+    }
+
+    var versionTrue = !version || conditionals[condition](parseFloat(agent.version), parseFloat(version));
+
+    return prefixTrue && versionTrue;
 }
 
 function features(uri) {
@@ -75,8 +103,8 @@ function features(uri) {
 
 function options(filename, req) {
     var opts = {},
-		url = req.url,
-		ua = req.headers && req.headers['user-agent'];
+        url = req.url,
+        ua = req.headers && req.headers['user-agent'];
 
     opts.paths = [path.dirname(filename), config.libs];
     opts.compress = config.compress;
@@ -86,51 +114,51 @@ function options(filename, req) {
 }
 
 function read(file, next) {
-	fs.readFile(file, 'utf-8', function (err, data) {
-		logger && logger.trace('Reading file ' + file);
-		
-		next(err, data);
-	});
+    fs.readFile(file, 'utf-8', function (err, data) {
+        logger && logger.trace('Reading file ' + file);
+
+        next(err, data);
+    });
 }
 
 function handle(req, res, next) {
-	if (cache[req.url])
-		return res.css(cache[req.url]);
+    if (cache[req.url])
+        return res.css(cache[req.url]);
 
     logger && logger.trace('Processing request' + req.url);
 
     var file = filename(req.url);
 
-	read(file, function (err, data) {
-		if (err) {
-			if (err.code !== 'ENOENT') {
-				res.error().end();
-				throw err;
-			} else
-				return res.notFound().end();
-		}
+    read(file, function (err, data) {
+        if (err) {
+            if (err.code !== 'ENOENT') {
+                res.error().end();
+                throw err;
+            } else
+                return res.notFound().end();
+        }
 
-		logger && logger.trace('Rendering file ' + file);
+        logger && logger.trace('Rendering file ' + file);
 
-		less.render(data, options(file, req), function (err, data) {
-			if (err) {
-				res.error().end();
-				throw err;
-			}
+        less.render(data, options(file, req), function (err, data) {
+            if (err) {
+                res.error().end();
+                throw err;
+            }
 
-			logger && logger.trace('Sending data (%d bytes) %s', data ? data.length : 0, req.url);
+            logger && logger.trace('Sending data (%d bytes) %s', data ? data.length : 0, req.url);
 
-			config.caching && (cache[req.url] = data);
-			res.css(data);
+            config.caching && (cache[req.url] = data);
+            res.css(data);
 
             logger && logger.trace('%s has been served successfully', req.url);
-		});
-	});
+        });
+    });
 }
 
 module.exports = function (cfg, log) {
-	config = cfg;
-	logger = log;
-	
-	return handle;
+    config = cfg;
+    logger = log;
+
+    return handle;
 };
