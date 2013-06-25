@@ -5,7 +5,7 @@
   "keywords"      : ["css", "parser", "lesscss", "feature toggle", "connect"],
   "author"        : "Artem Gurtovoy <tema.gurtovoy@gmail.com>",
   "contributors"  : [],
-  "version"       : "0.3.4",
+  "version"       : "0.3.5",
   "main"          : "./index",
   "dependencies": {
     "less-context-functions": "=0.0.4"
