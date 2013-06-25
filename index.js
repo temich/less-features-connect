@@ -2,7 +2,8 @@ var less = require('less-context-functions'),
     path = require('path'),
     url = require('url'),
     qs = require('querystring'),
-    fs = require('fs');
+    fs = require('fs'),
+    domain = require('domain');
 
 var root = path.resolve(process.cwd(), '..'),
     config = { libs: [] },
@@ -52,6 +53,29 @@ function read(file, next) {
 
 function handle(req, res, next) {
 
+    var d = domain.create();
+
+    d.on('error', function(err) {
+
+        err = err || {};
+        logger.error('Error processing request', req.url, err);
+        console.error('Error processing request', req.url, err);
+
+        try {
+
+            err && err.code !== 'ENOENT'
+                ? res.error().end()
+                : res.notFound().end();
+
+        } catch (e) {
+            logger.error('Error sending 500', err, req.url);
+        }
+
+    });
+
+    d.add(req);
+    d.add(res);
+
     if (cache[req.url])
         return res.css(cache[req.url]);
 
@@ -59,35 +83,20 @@ function handle(req, res, next) {
 
     var file = filename(req.url);
 
-    read(file, function (err, data) {
-
-        if (err) {
-
-            if (err.code !== 'ENOENT') {
-                res.error().end();
-                throw err;
-            } else
-                return res.notFound().end();
-
-        }
+    read(file, d.intercept(function(data) {
 
         logger && logger.trace('Rendering file ' + file);
 
-        less.render(data, options(file, req), function (err, data) {
-            if (err) {
-                res.error().end();
-                throw err;
-            }
-
+        less.render(data, options(file, req), d.intercept(function (data) {
             logger && logger.trace('Sending data (%d bytes) %s', data ? data.length : 0, req.url);
 
             config.caching && (cache[req.url] = data);
             res.css(data);
 
             logger && logger.trace('%s has been served successfully', req.url);
-        });
+        }));
 
-    });
+    }));
 
 }
 
