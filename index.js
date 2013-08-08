@@ -103,6 +103,10 @@ function handle(req, res, next) {
 module.exports = function (cfg, log) {
     config = cfg;
     logger = log;
+	
+	if (config.root) {
+		root = path.resolve(root, config.root);
+    }
 
     return handle;
 };
