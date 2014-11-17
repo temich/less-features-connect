@@ -51,6 +51,10 @@ function read(file, next) {
 
 }
 
+function clearCache() {
+    cache = {};
+}
+
 function handle(req, res, next) {
 
     var d = domain.create();
@@ -108,5 +112,9 @@ module.exports = function (cfg, log) {
 		root = path.resolve(root, config.root);
     }
 
-    return handle;
+    return {
+        handle: handle,
+        clearCache: clearCache
+    };
+
 };
