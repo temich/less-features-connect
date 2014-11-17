@@ -116,4 +116,5 @@ module.exports = function (cfg, log) {
         handle: handle,
         clearCache: clearCache
     };
+
 };

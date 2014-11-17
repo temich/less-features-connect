@@ -10,7 +10,7 @@ var connect = require('connect'),
 	config = require('./config.json');
 
 connect()
-    .use(dispatch({ '.*\\.css(\\?.*)?': less(config.less) }))
+    .use(dispatch({ '.*\\.css(\\?.*)?': less(config.less).handle }))
     .listen(process.env.PORT);
 
 
